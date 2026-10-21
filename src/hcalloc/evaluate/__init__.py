@@ -9,6 +9,7 @@ from .backtest import (
     paired_bootstrap,
     plan_task,
     run_tasks,
+    season_phases,
     standard_phases,
     summarise,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "paired_bootstrap",
     "plan_task",
     "run_tasks",
+    "season_phases",
     "standard_phases",
     "summarise",
 ]
