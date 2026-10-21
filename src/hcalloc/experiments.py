@@ -2,6 +2,7 @@
 
 1. Method comparison: does uncertainty-aware, coupled planning beat the baselines?
 2. Decision-based selection: does choosing the forecaster by decision regret beat choosing by MAE?
+   (The method comparison is also repeated on independently simulated hospitals, one per seed.)
 3. Override learning: can the system recover an administrator's hidden cost weights?
 4. Sensitivity: do the conclusions survive changes to the main cost and capacity assumptions?
 
@@ -38,7 +39,7 @@ from .evaluate.backtest import (
     standard_phases,
     summarise,
 )
-from .forecast.models import default_forecasters
+from .forecast.models import actuals, default_forecasters
 from .overrides.admin_sim import SimulatedAdministrator
 from .overrides.learner import OverrideLearner, override_share, plan_distance
 
@@ -52,6 +53,7 @@ class RunConfig:
     stress_start: str = "2023-10-01"
     workers: int = 4
     max_weeks: int | None = None  # limit evaluated weeks (for quick runs)
+    replication_seeds: tuple[int, ...] = (1, 2, 3, 4)  # extra simulated hospitals for the method comparison
     settings: PlanSettings = field(default_factory=PlanSettings)
 
 
@@ -181,6 +183,7 @@ def sensitivity_variants(hospital: HospitalConfig) -> dict[str, HospitalConfig]:
         "pump fleet 130": replace(hospital, pump_fleet=130),
         "pump fleet 180": replace(hospital, pump_fleet=180),
         "bed cost 1.0 (beds as costly as a nurse)": units(bed_cost=lambda u: 1.0),
+        "no patient overflow": replace(hospital, overflow=()),
     }
 
 
@@ -188,6 +191,31 @@ def sensitivity_experiment(pf: PeriodForecasts, cfg: RunConfig, methods=("determ
     frames = []
     for name, hosp in sensitivity_variants(default_hospital()).items():
         df = backtest(hosp, pf, methods, cfg.settings, workers=cfg.workers, label=name)
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True)
+
+
+def replication_experiment(cfg: RunConfig, methods=METHODS) -> pd.DataFrame:
+    """Repeat the method comparison on independently simulated hospitals (one per seed).
+
+    For each seed the forecaster is chosen by validation MAE, as in the main comparison.
+    """
+    frames = []
+    hospital = default_hospital()
+    for seed in cfg.replication_seeds:
+        series = simulate_hospital(seed=seed)
+        phases = standard_phases(series, cfg.horizon)
+        sel = phases["select"]
+        maes = {}
+        for f in default_forecasters():
+            f.fit(series, sel.fit_end)
+            maes[f.name] = float(np.abs(f.predict_many(series, sel.evaluate, cfg.horizon)
+                                        - actuals(series, sel.evaluate, cfg.horizon)).mean())
+        name = min(maes, key=maes.get)
+        f = next(x for x in default_forecasters() if x.name == name)
+        pf = _limit(forecast_period(series, f, phases["test"], cfg.horizon, cfg.n_scenarios, seed), cfg.max_weeks)
+        df = backtest(hospital, pf, methods, cfg.settings, workers=cfg.workers, label=f"seed {seed}")
+        df["seed"] = seed
         frames.append(df)
     return pd.concat(frames, ignore_index=True)
 
@@ -247,6 +275,14 @@ def run_all(out_dir: str | Path = "results", cfg: RunConfig | None = None, log=p
     sens = summarise(sens_weekly)
     sens.to_csv(out / "sensitivity_summary.csv", index=False)
 
+    log(f"replication on seeds {cfg.replication_seeds} ... ({time.time() - t0:.0f}s)")
+    rep_weekly = replication_experiment(cfg)
+    base = comp[(comp.label == "test") & comp.method.isin(list(METHODS) + ["oracle"])].assign(label=f"seed {cfg.seed}", seed=cfg.seed)
+    rep_weekly = pd.concat([base, rep_weekly], ignore_index=True)
+    rep_weekly.to_csv(out / "replication_weekly.csv", index=False)
+    rep = summarise(rep_weekly)
+    rep.to_csv(out / "replication_summary.csv", index=False)
+
     meta = {
         "data": {"kind": "semi-synthetic", "normal": normal.provenance, "stress": stress.provenance},
         "hospital": asdict(hospital),
@@ -261,6 +297,8 @@ def run_all(out_dir: str | Path = "results", cfg: RunConfig | None = None, log=p
     (out / "run_metadata.json").write_text(json.dumps(meta, indent=2, default=str))
     from .report import write_report
 
-    write_report(out, fmetrics, sel, choice, comp, comp_summary, ovr, meta, sel_weekly=sel_weekly, sens=sens)
+    meta["runtime_seconds"] = round(time.time() - t0, 1)
+    (out / "run_metadata.json").write_text(json.dumps(meta, indent=2, default=str))
+    write_report(out, fmetrics, sel, choice, comp, comp_summary, ovr, meta, sel_weekly=sel_weekly, sens=sens, rep=rep)
     log(f"done in {time.time() - t0:.0f}s -> {out}")
     return meta

@@ -39,6 +39,9 @@ class HospitalConfig:
     float_pool: int  # float-pool nurses per day (already paid, assigned on the day)
     pump_fleet: int  # mobile infusion pumps owned
     pump_moves_max: int = 20  # pump transfers logistics can do per day
+    # (home, host) pairs: a home-unit patient may be cared for in a host unit's spare bed ("outlying")
+    overflow: tuple[tuple[str, str], ...] = ()
+    outlier_cost: float = 1.0  # per outlying patient-day (longer stays, extra handovers, safety risk)
     nurse_cost: float = 1.0
     agency_cost: float = 2.0
     nurse_move_cost: float = 0.15
@@ -60,6 +63,15 @@ class HospitalConfig:
         idx = {n: i for i, n in enumerate(self.unit_names)}
         m = np.zeros((self.n_units, self.n_units), dtype=bool)
         for a, b in self.nurse_moves:
+            m[idx[a], idx[b]] = True
+        np.fill_diagonal(m, False)
+        return m
+
+    def overflow_matrix(self) -> np.ndarray:
+        """Boolean (home, host) matrix of allowed patient overflow."""
+        idx = {n: i for i, n in enumerate(self.unit_names)}
+        m = np.zeros((self.n_units, self.n_units), dtype=bool)
+        for a, b in self.overflow:
             m[idx[a], idx[b]] = True
         np.fill_diagonal(m, False)
         return m
@@ -86,7 +98,14 @@ def default_hospital() -> HospitalConfig:
         ("StepDown", "Medical"), ("StepDown", "Surgical"),
         ("Medical", "Surgical"), ("Surgical", "Medical"),
     )
-    return HospitalConfig(units=units, nurse_moves=moves, nurse_pool_max=48, float_pool=4, pump_fleet=150)
+    # Patients may outlie only into a unit of the same or higher level of care.
+    overflow = (
+        ("Medical", "Surgical"), ("Surgical", "Medical"),
+        ("Medical", "StepDown"), ("Surgical", "StepDown"),
+        ("StepDown", "ICU"),
+    )
+    return HospitalConfig(units=units, nurse_moves=moves, nurse_pool_max=48, float_pool=4, pump_fleet=150,
+                          overflow=overflow)
 
 
 @dataclass(frozen=True)

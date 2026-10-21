@@ -16,6 +16,7 @@ Costs are relative. **1.0 = the cost of one rostered nurse-day.**
 | Escalation (surge) bed-day | 1.5 | `Unit.surge_cost` |
 | Unserved patient-day, ICU | 12 | `Unit.shortage_cost` |
 | Unserved patient-day, other units | 6 | `Unit.shortage_cost` |
+| Outlying patient-day (cared for on another unit) | 1.0 | `HospitalConfig.outlier_cost` |
 
 "Unserved" stands for boarding in the ED, diversion, outlying, or a cancelled elective. The shortage-to-nurse cost ratio is the assumption results are most sensitive to; the plan calls for a sweep from 2:1 to 20:1.
 
@@ -30,12 +31,13 @@ Costs are relative. **1.0 = the cost of one rostered nurse-day.**
 
 - Rostered nurses available per day across all units: 48. Float pool: 4 per day. Pump fleet: 150. Pump transfers per day: at most 20.
 - Allowed nurse redeployments: ICU to any unit; StepDown to Medical or Surgical; Medical and Surgical to each other. Ward nurses never move into ICU.
+- Allowed patient overflow (outlying), only into the same or a higher level of care: Medical and Surgical to each other, Medical or Surgical to StepDown, StepDown to ICU. An outlying patient uses a bed, nurse time at its home unit's ratio, and pumps at its home unit's rate, all on the host unit.
 - A "nurse" is one nurse position for the day. Ratios are applied per day, not per shift.
 
 ## Model simplifications
 
 - Days in the horizon are linked only through first-stage decisions. Unserved patients do not carry over to the next day.
-- Patients cannot overflow into another unit's beds. In real hospitals outlying is common, so shortage here is an upper bound.
+- Outlying is decided day by day; a patient's place is not tracked across days.
 - Recourse decisions (agency, moves, surge beds) are continuous; first-stage decisions are integers.
 - Pumps start each day fully deployed across units; there is no central store.
 - The plan is made once a week (Sunday for Monday to Sunday). Daily re-planning is supported by the code but not used in the benchmarks.

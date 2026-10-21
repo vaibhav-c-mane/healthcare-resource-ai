@@ -14,12 +14,29 @@ def test_nurse_ratio_is_never_violated(hospital):
     d = demand(hospital, [30, 30, 100, 60])  # far above capacity
     plan = solve_allocation(hospital, d, return_detail=True)
     served = plan.detail["served"][..., 0]
-    ratio = hospital.vector("patients_per_nurse")[:, None]
+    hosted = plan.detail["outliers"][..., 0]  # (home, host, T)
+    ratio = hospital.vector("patients_per_nurse")
     moves = plan.detail["nurse_moves"][..., 0]
     cap = plan.nurses - moves.sum(axis=1) + moves.sum(axis=0) + plan.detail["floaters"][..., 0] + plan.detail["agency"][..., 0]
-    assert np.all(served <= ratio * cap + 1e-6)
-    assert np.all(served <= plan.beds + plan.detail["surge"][..., 0] + 1e-6)
+    need = served / ratio[:, None] + (hosted / ratio[:, None, None]).sum(axis=0)
+    assert np.all(need <= cap + 1e-6)
+    assert np.all(served + hosted.sum(axis=0) <= plan.beds + plan.detail["surge"][..., 0] + 1e-6)
     assert plan.detail["shortage"].sum() > 0
+
+
+def test_overflow_moves_patients_to_spare_beds(hospital):
+    from dataclasses import replace
+
+    d = demand(hospital, [8, 10, 95, 20])  # Medical far over its 76 + 10 beds, Surgical nearly empty
+    with_overflow = solve_allocation(hospital, d, return_detail=True)
+    without = solve_allocation(replace(hospital, overflow=()), d, return_detail=True)
+    out = with_overflow.detail["outliers"][..., 0]
+    names = hospital.unit_names
+    assert out[names.index("Medical"), names.index("Surgical")].sum() > 0
+    assert out[names.index("Surgical"), names.index("Medical")].sum() < 1e-6
+    assert with_overflow.detail["shortage"].sum() < without.detail["shortage"].sum()
+    # outlying is never allowed into a lower level of care
+    assert out[names.index("StepDown"), names.index("Medical")].sum() == 0
 
 
 def test_low_demand_has_no_shortage(hospital):
