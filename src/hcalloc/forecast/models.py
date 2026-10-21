@@ -25,6 +25,16 @@ def actuals(series: DailySeries, origins, horizon: int) -> np.ndarray:
     return series.census[target_index(origins, horizon)].transpose(0, 2, 1)
 
 
+def valid_origins(series: DailySeries, origins, horizon: int, history: int = 28) -> np.ndarray:
+    """Origins whose last ``history`` days and next ``horizon`` days are all observed."""
+    origins = np.asarray(origins, dtype=int)
+    cs = np.concatenate([[0], np.cumsum(series.observed)])
+    lo, hi = origins - history + 1, origins + horizon
+    ok = (lo >= 0) & (hi < len(series))
+    ok[ok] = cs[hi[ok] + 1] - cs[lo[ok]] == hi[ok] - lo[ok] + 1
+    return origins[ok]
+
+
 def _calendar(series: DailySeries, idx: np.ndarray) -> dict:
     dates = series.dates[0] + pd.to_timedelta(idx.ravel(), unit="D")
     doy = dates.dayofyear.to_numpy().reshape(idx.shape)
@@ -71,6 +81,8 @@ class HoltWinters(Forecaster):
 
     Smoothing parameters are fitted once on the training window; at each origin
     the states are re-filtered on the last ``window`` days, which is cheap.
+    With gaps in the data (winter-only sitreps), each observed run is filtered
+    from a fresh start and runs shorter than two weeks are skipped.
     """
 
     name = "holt_winters"
@@ -95,10 +107,13 @@ class HoltWinters(Forecaster):
 
     def fit(self, series, end):
         self.params = []
+        lo = max(0, end - 729)
+        runs = [(max(a, lo), min(b, end)) for a, b in series.segments() if min(b, end) - max(a, lo) >= 13]
         for j in range(len(series.units)):
-            y = series.census[max(0, end - 729): end + 1, j]
+            ys = [series.census[a: b + 1, j] for a, b in runs]
             res = minimize(
-                lambda p: self._filter(y, *p)[2], x0=[0.3, 0.1], bounds=[(0.01, 0.99), (0.01, 0.99)], method="L-BFGS-B"
+                lambda p: sum(self._filter(y.copy(), *p)[2] for y in ys), x0=[0.3, 0.1],
+                bounds=[(0.01, 0.99), (0.01, 0.99)], method="L-BFGS-B",
             )
             self.params.append(tuple(res.x))
         return self
@@ -106,8 +121,10 @@ class HoltWinters(Forecaster):
     def predict_many(self, series, origins, horizon):
         origins = np.asarray(origins)
         out = np.zeros((len(origins), len(series.units), horizon))
+        runs = series.segments()
         for k, o in enumerate(origins):
-            start = max(0, o - self.window + 1)
+            run_start = next(a for a, b in runs if a <= o <= b)
+            start = max(run_start, o - self.window + 1)
             for j, (alpha, gamma) in enumerate(self.params):
                 y = series.census[start: o + 1, j]
                 level, season, _ = self._filter(y.copy(), alpha, gamma)
@@ -122,31 +139,40 @@ class GradientBoosting(Forecaster):
     One model for all units and horizons on scale-free features. ``quantile``
     sets the training loss: 0.5 gives the median; a higher value is the
     cost-weighted variant (newsvendor critical fractile).
+
+    ``relative=True`` scales census features and targets by each origin's own
+    28-day mean instead of the training mean, so the trees forecast relative
+    change and can follow a level that drifts above anything in training (as
+    trust bed bases do from one winter to the next).
     """
 
     name = "gbm"
 
-    def __init__(self, quantile: float = 0.5, max_iter: int = 300, seed: int = 0):
+    def __init__(self, quantile: float = 0.5, max_iter: int = 300, seed: int = 0, relative: bool = False):
         self.quantile = quantile
         self.max_iter = max_iter
         self.seed = seed
+        self.relative = relative
         if quantile != 0.5:
             self.name = f"gbm_q{int(round(quantile * 100))}"
 
     def _design(self, series, origins, horizon):
         origins = np.asarray(origins)
         c = series.census / self.scale_c
-        a = series.admissions / self.scale_a
         n_units = c.shape[1]
-        cs = np.vstack([np.zeros((1, n_units)), np.cumsum(c, axis=0)])
+        # unobserved days are zero here; valid origins never average across them
+        cs = np.vstack([np.zeros((1, n_units)), np.cumsum(np.nan_to_num(c), axis=0)])
         tgt = target_index(origins, horizon)
         cal = _calendar(series, tgt)
         lag_c = np.stack([c[origins - k] for k in range(14)], axis=-1)  # (K, U, 14)
-        lag_a = np.stack([a[origins - k] for k in range(7)], axis=-1)  # (K, U, 7)
         mean7 = (cs[origins + 1] - cs[origins - 6]) / 7
         mean28 = (cs[origins + 1] - cs[origins - 27]) / 28
         last_week = c[_same_weekday_lag(tgt, origins)].transpose(0, 2, 1)  # (K, U, H)
         shape = (len(origins), n_units, horizon)
+        if self.relative:
+            lvl = np.maximum(mean28, 1e-6)
+            lag_c, last_week, mean7 = lag_c / lvl[..., None], last_week / lvl[..., None], mean7 / lvl
+            mean28 = np.zeros_like(mean28)  # the level itself is left out, so trees cannot key on it
 
         def b(x):
             return np.broadcast_to(x, shape)[..., None]
@@ -162,17 +188,22 @@ class GradientBoosting(Forecaster):
             b(mean7[:, :, None]),
             b(mean28[:, :, None]),
             np.broadcast_to(lag_c[:, :, None, :], shape + (14,)),
-            np.broadcast_to(lag_a[:, :, None, :], shape + (7,)),
         ]
+        if self.use_flows:  # census-only sources (sitreps) have no admissions
+            a = series.admissions / self.scale_a
+            lag_a = np.stack([a[origins - k] for k in range(7)], axis=-1)  # (K, U, 7)
+            cols.append(np.broadcast_to(lag_a[:, :, None, :], shape + (7,)))
         return np.concatenate(cols, axis=-1).reshape(-1, sum(x.shape[-1] for x in cols))
 
     def fit(self, series, end):
-        self.scale_c = series.census[: end + 1].mean(axis=0)
-        self.scale_a = np.maximum(series.admissions[: end + 1].mean(axis=0), 1e-6)
+        self.scale_c = np.nanmean(series.census[: end + 1], axis=0)
+        self.use_flows = series.has_flows
+        if self.use_flows:
+            self.scale_a = np.maximum(series.admissions[: end + 1].mean(axis=0), 1e-6)
         horizon = 7
-        origins = np.arange(27, end - horizon + 1)
+        origins = valid_origins(series, np.arange(27, end - horizon + 1), horizon)
         x = self._design(series, origins, horizon)
-        y = (actuals(series, origins, horizon) / self.scale_c[None, :, None]).ravel()
+        y = (actuals(series, origins, horizon) / self._scale(series, origins)).ravel()
         self.model = HistGradientBoostingRegressor(
             loss="quantile",
             quantile=self.quantile,
@@ -184,10 +215,18 @@ class GradientBoosting(Forecaster):
         ).fit(x, y)
         return self
 
+    def _scale(self, series, origins) -> np.ndarray:
+        """Divisor of the targets, shape (K, U, 1)."""
+        if not self.relative:
+            return self.scale_c[None, :, None]
+        origins = np.asarray(origins)
+        window = np.stack([series.census[origins - k] for k in range(28)], axis=-1)
+        return np.maximum(window.mean(axis=-1), 1e-6)[..., None]
+
     def predict_many(self, series, origins, horizon):
         x = self._design(series, origins, horizon)
         pred = self.model.predict(x).reshape(len(origins), len(series.units), horizon)
-        return np.maximum(pred * self.scale_c[None, :, None], 0.0)
+        return np.maximum(pred * self._scale(series, origins), 0.0)
 
 
 class NegBinGLM(Forecaster):
@@ -200,7 +239,7 @@ class NegBinGLM(Forecaster):
         c = series.census[:, j]
         tgt = target_index(origins, horizon)
         cal = _calendar(series, tgt)
-        cs = np.concatenate([[0.0], np.cumsum(c)])
+        cs = np.concatenate([[0.0], np.cumsum(np.nan_to_num(c))])
         mean7 = (cs[origins + 1] - cs[origins - 6]) / 7
         k, h = tgt.shape
         cols = [
@@ -218,7 +257,7 @@ class NegBinGLM(Forecaster):
 
     def fit(self, series, end):
         horizon = 7
-        origins = np.arange(27, end - horizon + 1)
+        origins = valid_origins(series, np.arange(27, end - horizon + 1), horizon)
         self.models = []
         for j in range(len(series.units)):
             x = self._design(series, origins, horizon, j)
@@ -247,6 +286,8 @@ class FlowModel(Forecaster):
     name = "flow"
 
     def fit(self, series, end):
+        if not series.has_flows:
+            raise ValueError("the flow model needs admissions and discharges; this series has census only")
         lo = max(1, end - 729)
         dow = series.dates.dayofweek.to_numpy()
         adm = series.admissions[lo: end + 1]
@@ -292,5 +333,11 @@ class FlowModel(Forecaster):
         return out
 
 
-def default_forecasters() -> list[Forecaster]:
-    return [SeasonalNaive(), HoltWinters(), GradientBoosting(), NegBinGLM(), FlowModel()]
+def default_forecasters(census_only: bool = False) -> list[Forecaster]:
+    """All forecasters.
+
+    ``census_only`` (winter sitreps) leaves out the flow model, which needs admissions and
+    discharges, and uses level-relative gradient boosting.
+    """
+    models = [SeasonalNaive(), HoltWinters(), GradientBoosting(relative=census_only), NegBinGLM()]
+    return models if census_only else models + [FlowModel()]

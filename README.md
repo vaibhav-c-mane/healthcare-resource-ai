@@ -25,6 +25,7 @@ hcalloc simulate --out data/synthetic_hospital.csv          # 5 years of SYNTHET
 hcalloc plan --data data/synthetic_hospital.csv --out plan.csv   # next week's recommendation
 hcalloc app                                                  # offline web app on localhost
 hcalloc experiments --out results                            # full benchmarks (about 30 minutes on 4 cores)
+hcalloc sitrep-fetch && hcalloc sitrep                       # same engine on real NHS bed occupancy (about 2 minutes)
 pytest                                                       # unit tests
 ```
 
@@ -44,6 +45,7 @@ src/hcalloc/
   report.py              figures and REPORT.md
 docs/                    assumptions and data guide
 results/                 outputs of `hcalloc experiments` (synthetic)
+results/nhs_sitrep/      outputs of `hcalloc sitrep` (real NHS occupancy, assumed staffing and costs)
 tests/                   unit tests
 ```
 
@@ -60,6 +62,15 @@ One 52-week test year, a plan every Sunday, scored against perfect foresight. Fu
 | Learn from administrator overrides | Works on a simulated administrator: overrides 48% smaller after learning; recovered weights near the hidden ones. Needs real override logs to confirm. |
 | Offline, low-cost | A weekly plan takes about 3 seconds on a 4-core CPU; no GPU, no network. |
 
+## Results on real NHS bed occupancy
+
+Three English trusts (Torbay and South Devon, Dudley, Newcastle upon Tyne), adult G&A and adult critical care beds occupied each day from NHS England's UEC daily sitreps, four winters 2021-22 to 2024-25; tested on 14 weekly plans in winter 2024-25. **Demand is real; staffing ratios, nurse pools, pumps and costs are assumed.** Full report: [results/nhs_sitrep/REPORT.md](results/nhs_sitrep/REPORT.md).
+
+- Stochastic planning beat the 85% occupancy rule clearly (7.3 regret points lower per week, 95% CI 6.4 to 8.4, pooled over trusts).
+- Against planning on a point forecast or on the 80th percentile, the advantage seen on synthetic data did not show up: differences were within about a point and not statistically clear on 42 trust-weeks.
+- The CVaR term cost slightly more than planning for expected cost (+0.7 points, 95% CI +0.1 to +1.3), and coupled planning was no better than sequential at these assumed staffing levels.
+- The best forecaster per trust was off by about 3% for G&A and 6 to 17% for critical care (small units are noisy); Holt-Winters or level-relative gradient boosting beat last week's value at every trust, and conformal 90% intervals covered 84 to 91% of outcomes.
+
 ## Status and next steps
 
-v1 implements the plan of record end to end on synthetic data. Next: run on real aggregate data (NHS England sitreps, MIMIC-IV, or a partner hospital), widen the cost sweep, and pilot the app in advisory mode.
+v1 implements the plan of record end to end on synthetic data. It has also been run on real NHS occupancy (above). Next: real staffing and cost data from a partner hospital, MIMIC-IV flows, widen the cost sweep, and pilot the app in advisory mode.

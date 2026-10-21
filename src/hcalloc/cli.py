@@ -33,6 +33,15 @@ def main(argv=None) -> int:
     e.add_argument("--workers", type=int, default=4)
     e.add_argument("--seed", type=int, default=0)
 
+    sf = sub.add_parser("sitrep-fetch", help="download NHS England UEC daily sitrep workbooks (open data)")
+    sf.add_argument("--out", default="data/sitrep")
+
+    sr = sub.add_parser("sitrep", help="run the backtest on real NHS bed occupancy (staffing and costs assumed)")
+    sr.add_argument("--files", nargs="+", default=None, help="sitrep workbooks (default: data/sitrep/*.xlsx)")
+    sr.add_argument("--trusts", nargs="+", default=None, help="trust codes (default: RA9 RNA RTD)")
+    sr.add_argument("--out", default="results/nhs_sitrep")
+    sr.add_argument("--workers", type=int, default=4)
+
     r = sub.add_parser("report", help="rebuild figures and REPORT.md from an existing results folder")
     r.add_argument("--out", default="results")
 
@@ -68,6 +77,19 @@ def main(argv=None) -> int:
         if a.quick:
             cfg = RunConfig(seed=a.seed, workers=a.workers, max_weeks=8, scales=(1.0, 1.25))
         run_all(a.out, cfg)
+    elif a.cmd == "sitrep-fetch":
+        from .sitrep import download_sitreps
+
+        for path in download_sitreps(a.out):
+            print(path)
+    elif a.cmd == "sitrep":
+        from .sitrep import DEFAULT_TRUSTS, SitrepRunConfig, run_sitrep
+
+        files = a.files or sorted(Path("data/sitrep").glob("*.xlsx"))
+        if not files:
+            print("no sitrep workbooks found; run `hcalloc sitrep-fetch` first", file=sys.stderr)
+            return 1
+        run_sitrep(files, a.out, SitrepRunConfig(trusts=tuple(a.trusts or DEFAULT_TRUSTS), workers=a.workers))
     elif a.cmd == "report":
         from .report import rebuild
 
