@@ -214,7 +214,9 @@ def write_report(out: Path, fmetrics, sel, choice, comp, comp_summary, ovr, meta
               "`docs/assumptions.md`.",
               "- Days are planned independently given first-stage decisions, unserved patients do not carry over, and outlying "
               "to another unit is decided day by day.",
-              "- One synthetic hospital and one seed; repeat with other seeds and with real aggregate data before drawing conclusions.",
+              ("- All hospitals come from one simulator with the same structure; repeat with real aggregate data before "
+               "drawing conclusions." if rep is not None else
+               "- One synthetic hospital and one seed; repeat with other seeds and with real aggregate data before drawing conclusions."),
               ""]
     (out / "REPORT.md").write_text("\n".join(lines))
 
@@ -291,11 +293,13 @@ def _findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens, rep=
         simple = piv[["rule", "deterministic", "quantile"]].min(axis=1)
         wins = int((piv["joint_cvar"] < simple).sum())
         coup = piv["sequential"] - piv["joint_cvar"]
+        risk = piv["joint_cvar"] - piv["joint"]
         out.append(f"- **Replication ({len(piv)} simulated hospitals):** joint + CVaR had lower regret than every method "
                    f"that ignores uncertainty in {wins} of {len(piv)} hospitals (mean {piv['joint_cvar'].mean():.1f}% vs "
                    f"{simple.mean():.1f}% for the best such method per hospital). Regret points saved by joint over "
                    f"sequential planning: mean {coup.mean():+.1f}, range {coup.min():+.1f} to {coup.max():+.1f} "
-                   f"(positive in {int((coup > 0).sum())} of {len(piv)} hospitals).")
+                   f"(positive in {int((coup > 0).sum())} of {len(piv)} hospitals). Adding the CVaR term changed regret by "
+                   f"{risk.mean():+.1f} points on average (higher with CVaR in {int((risk > 0).sum())} of {len(piv)} hospitals).")
     return out
 
 
