@@ -6,18 +6,20 @@ First stage (decided now, before demand is known), per unit u and day t:
     pumps[u, t]   infusion pumps placed on the unit at the start of the day
 
 Second stage (recourse, per demand scenario s, after demand is revealed):
-    served / shortage patients, escalation (surge) beds, float-pool and agency
-    nurses, nurse redeployments between compatible units, and pump transfers.
+    patients served on their home unit, outlying to an allowed host unit, or
+    unserved (shortage); escalation (surge) beds, float-pool and agency nurses,
+    nurse redeployments between compatible units, and pump transfers.
 
 Coupling: a patient is served only if there is an open bed, enough nurse
-capacity at the unit's hard ratio, and enough pumps. Nurse ratios are hard
-constraints; unmet demand becomes shortage, which is costed and reported.
+capacity at the hard ratio of the patient's home unit, and enough pumps, all on
+the unit where the patient is cared for. Nurse ratios are hard constraints;
+unmet demand becomes shortage, which is costed and reported.
 
 Objective: first-stage cost + (1 - lambda) * E[recourse] + lambda * CVaR_alpha[recourse].
 
 Simplifications (documented in docs/assumptions.md): days are independent
-given first-stage decisions, unserved patients do not carry over, and
-recourse variables are continuous.
+given first-stage decisions, unserved patients do not carry over, outlying is
+decided per day, and recourse variables are continuous.
 """
 
 from __future__ import annotations
@@ -127,16 +129,22 @@ def solve_allocation(
     served = lp.add_vars(shape3)
     short = lp.add_vars(shape3)
     surge = lp.add_vars(shape3, ub=surge_max)
+    # outliers[home, host, t, s]: home-unit patients cared for in a host unit's bed
+    outliers = lp.add_vars((n_units, n_units, horizon, s_count),
+                           ub=np.where(hospital.overflow_matrix(), np.inf, 0.0)[:, :, None, None])
+    out_of = outliers.transpose(0, 2, 3, 1)  # (home, t, s, host): patients sent away
+    hosted = outliers.transpose(1, 2, 3, 0)  # (host, t, s, home): patients taken in
     d = demand.transpose(1, 2, 0)
-    lp.add_constraints([(1.0, served), (1.0, short)], lb=d, ub=d)
-    lp.add_constraints([(1.0, served), (-1.0, beds[:, :, None]), (-1.0, surge)], ub=0.0)
+    lp.add_constraints([(1.0, served), (1.0, short), (1.0, out_of, True)], lb=d, ub=d)
+    lp.add_constraints([(1.0, served), (1.0, hosted, True), (-1.0, beds[:, :, None]), (-1.0, surge)], ub=0.0)
 
     cost_terms = [
         (-np.repeat(shortage_cost, horizon), short.transpose(2, 0, 1).reshape(s_count, -1), True),
         (-np.repeat(surge_cost, horizon), surge.transpose(2, 0, 1).reshape(s_count, -1), True),
+        (-hospital.outlier_cost, outliers.transpose(3, 0, 1, 2).reshape(s_count, -1), True),
     ]
 
-    detail_idx = {"served": served, "shortage": short, "surge": surge}
+    detail_idx = {"served": served, "shortage": short, "surge": surge, "outliers": outliers}
     if use_nurses:
         allowed = hospital.move_matrix()
         floaters = lp.add_vars(shape3, ub=hospital.float_pool * float_ok)
@@ -148,6 +156,7 @@ def solve_allocation(
         lp.add_constraints(
             [
                 (1.0 / ratio[:, None, None], served),
+                ((1.0 / ratio)[None, None, None, :], hosted, True),  # outliers keep their home unit's ratio
                 (-1.0, nurses[:, :, None]),
                 (1.0, moves_out, True),
                 (-1.0, moves_in, True),
@@ -172,6 +181,7 @@ def solve_allocation(
         lp.add_constraints(
             [
                 (pump_need[:, None, None], served),
+                (pump_need[None, None, None, :], hosted, True),
                 (-1.0, pumps[:, :, None]),
                 (1.0, pumps_out, True),
                 (-1.0, pumps_in, True),

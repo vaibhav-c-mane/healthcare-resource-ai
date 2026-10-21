@@ -217,6 +217,7 @@ def summarise(df: pd.DataFrame, by=("label", "method")) -> pd.DataFrame:
                 "cvar90_weekly_cost": cvar(g.total_cost.to_numpy(), 0.9),
                 "shortage_patient_days": g.shortage_patient_days.sum(),
                 "shortage_unit_day_rate_pct": 100 * g.shortage_unit_days.sum() / g.unit_days.sum(),
+                "outlier_patient_days": g.outlier_patient_days.sum(),
                 "idle_bed_days": g.idle_bed_days.sum(),
                 "excess_nurse_days": g.excess_nurse_days.sum(),
                 "agency_nurse_days": g.agency_nurse_days.sum(),

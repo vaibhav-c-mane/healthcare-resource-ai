@@ -90,7 +90,7 @@ def _fig_overrides(ovr: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def write_report(out: Path, fmetrics, sel, choice, comp, comp_summary, ovr, meta, sel_weekly=None, sens=None) -> None:
+def write_report(out: Path, fmetrics, sel, choice, comp, comp_summary, ovr, meta, sel_weekly=None, sens=None, rep=None) -> None:
     out = Path(out)
     fig = out / "figures"
     fig.mkdir(exist_ok=True)
@@ -111,13 +111,13 @@ def write_report(out: Path, fmetrics, sel, choice, comp, comp_summary, ovr, meta
         "",
         "## Key findings",
         "",
-        *_findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens),
+        *_findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens, rep),
         "",
     ]
 
     # Experiment 1
     keep = ["method", "mean_weekly_cost", "regret_pct", "cvar90_weekly_cost", "shortage_patient_days",
-            "shortage_unit_day_rate_pct", "idle_bed_days", "excess_nurse_days", "agency_nurse_days"]
+            "shortage_unit_day_rate_pct", "outlier_patient_days", "idle_bed_days", "excess_nurse_days", "agency_nurse_days"]
     lines += ["## 1. Method comparison", "",
               f"Forecasts for every method come from the forecaster with the lowest validation MAE (`{choice['mae'][0]}`), "
               "except the last row, which uses the configuration chosen by validation regret "
@@ -193,11 +193,27 @@ def write_report(out: Path, fmetrics, sel, choice, comp, comp_summary, ovr, meta
                   "(forecaster `flow`). Each variant uses its own costs for both planning and scoring.", "",
                   md_table(piv, 1), ""]
 
+    if rep is not None:
+        piv = rep.pivot_table(index="label", columns="method", values="regret_pct", sort=False)
+        order = [m for m in METHOD_LABELS if m in piv.columns and m != "oracle"]
+        stats = pd.DataFrame({
+            "method": [METHOD_LABELS[m] for m in order],
+            "mean regret %": [piv[m].mean() for m in order],
+            "sd": [piv[m].std(ddof=1) for m in order],
+            "min": [piv[m].min() for m in order],
+            "max": [piv[m].max() for m in order],
+        })
+        per_seed = piv[order].reset_index().rename(columns={"label": "hospital"}).rename(columns=METHOD_LABELS)
+        lines += [f"## 5. Replication on {len(piv)} independently simulated hospitals", "",
+                  "Same comparison on the normal test year, one simulated hospital per seed; each seed uses its own "
+                  "validation-MAE forecaster.", "", md_table(stats, 1), "", "Per hospital (regret %):", "",
+                  md_table(per_seed, 1), ""]
+
     lines += ["## Limitations", "",
               "- Demand, staffing ratios, equipment needs, costs and administrator behaviour are simulated or assumed; see "
               "`docs/assumptions.md`.",
-              "- Days are planned independently given first-stage decisions, unserved patients do not carry over, and patients "
-              "cannot overflow into another unit's beds.",
+              "- Days are planned independently given first-stage decisions, unserved patients do not carry over, and outlying "
+              "to another unit is decided day by day.",
               "- One synthetic hospital and one seed; repeat with other seeds and with real aggregate data before drawing conclusions.",
               ""]
     (out / "REPORT.md").write_text("\n".join(lines))
@@ -207,7 +223,7 @@ def _ci_text(d: float, lo: float, hi: float) -> str:
     return f"{d:+.1f} per week, 95% CI {lo:+.1f} to {hi:+.1f}"
 
 
-def _findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens) -> list[str]:
+def _findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens, rep=None) -> list[str]:
     out = []
     t = comp_summary.set_index(["label", "method"])
     for label, name in (("test", "normal year"), ("stress", "stress-wave year")):
@@ -228,8 +244,11 @@ def _findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens) -> l
                f"{cv_jc:,.0f} with CVaR vs {cv_j:,.0f} without (normal year) and {cv_jc_s:,.0f} vs {cv_j_s:,.0f} (stress year). "
                f"Mean weekly cost difference: {_ci_text(d2, lo2, hi2)}. In these runs the risk term "
                f"{'did not clearly reduce bad-week cost' if abs(cv_jc - cv_j) < 0.01 * cv_j or cv_jc >= cv_j else 'reduced bad-week cost'}.")
-    sline = (f"- **Choosing forecasters by decisions:** forecaster rankings by CRPS and by decision regret agreed "
-             f"(Spearman {choice['spearman_crps_vs_regret']:.2f}); MAE agreed less ({choice['spearman_mae_vs_regret']:.2f}). "
+    r_crps, r_mae = choice["spearman_crps_vs_regret"], choice["spearman_mae_vs_regret"]
+    closer = ("CRPS tracked regret more closely than MAE" if r_crps > r_mae + 1e-9 else
+              "MAE tracked regret more closely than CRPS" if r_mae > r_crps + 1e-9 else "CRPS and MAE tracked regret equally")
+    sline = (f"- **Choosing forecasters by decisions:** Spearman rank correlation with decision regret across forecasters was "
+             f"{r_crps:.2f} for CRPS and {r_mae:.2f} for MAE ({closer}). "
              f"Validation regret picked `{choice['regret'][0]}` (scale {choice['regret'][1]}) and MAE picked `{choice['mae'][0]}`.")
     if sel_weekly is not None:
         tw = sel_weekly[sel_weekly.phase == "test"]
@@ -267,6 +286,16 @@ def _findings(comp, comp_summary, sel, choice, ovr, meta, sel_weekly, sens) -> l
                    f"{adv.max():.1f} points ({adv.idxmax()}). Joint minus sequential planning, in regret points saved "
                    "(positive means joint is better): " + ", ".join(f"{k}: {v:+.1f}" for k, v in gap.items())
                    + ". Coupling helps most where a movable resource is scarce or opening beds is expensive.")
+    if rep is not None:
+        piv = rep.pivot_table(index="label", columns="method", values="regret_pct", sort=False)
+        simple = piv[["rule", "deterministic", "quantile"]].min(axis=1)
+        wins = int((piv["joint_cvar"] < simple).sum())
+        coup = piv["sequential"] - piv["joint_cvar"]
+        out.append(f"- **Replication ({len(piv)} simulated hospitals):** joint + CVaR had lower regret than every method "
+                   f"that ignores uncertainty in {wins} of {len(piv)} hospitals (mean {piv['joint_cvar'].mean():.1f}% vs "
+                   f"{simple.mean():.1f}% for the best such method per hospital). Regret points saved by joint over "
+                   f"sequential planning: mean {coup.mean():+.1f}, range {coup.min():+.1f} to {coup.max():+.1f} "
+                   f"(positive in {int((coup > 0).sum())} of {len(piv)} hospitals).")
     return out
 
 
@@ -281,6 +310,7 @@ def rebuild(out_dir: str | Path = "results") -> None:
     meta["choice"]["crps"] = tuple(meta["choice"]["crps"])
     sens = pd.read_csv(out / "sensitivity_summary.csv") if (out / "sensitivity_summary.csv").exists() else None
     sel_weekly = pd.read_csv(out / "selection_weekly.csv") if (out / "selection_weekly.csv").exists() else None
+    rep = pd.read_csv(out / "replication_summary.csv") if (out / "replication_summary.csv").exists() else None
     write_report(out, pd.read_csv(out / "forecast_metrics.csv"), pd.read_csv(out / "selection.csv"), meta["choice"],
                  pd.read_csv(out / "comparison_weekly.csv"), pd.read_csv(out / "comparison_summary.csv"),
-                 pd.read_csv(out / "overrides.csv"), meta, sel_weekly=sel_weekly, sens=sens)
+                 pd.read_csv(out / "overrides.csv"), meta, sel_weekly=sel_weekly, sens=sens, rep=rep)
