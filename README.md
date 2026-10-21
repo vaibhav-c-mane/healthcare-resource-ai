@@ -49,17 +49,19 @@ tests/                   unit tests
 
 ## Results so far (semi-synthetic data)
 
-One 52-week test year, a plan every Sunday, scored against perfect foresight. Full tables, figures and confidence intervals: [results/REPORT.md](results/REPORT.md).
+One 52-week test year, a plan every Sunday, scored against perfect foresight; the method comparison is repeated on four more independently simulated hospitals. Full tables, figures and confidence intervals: [results/REPORT.md](results/REPORT.md).
 
 | Claim from the plan | Result |
 | --- | --- |
-| Forecast-then-allocate with uncertainty beats point forecasts | Yes. Regret 13.7% vs 23.0% for the best method that ignores uncertainty (41% lower); 11.5% vs 20.3% in a stress-wave year. Held in all six sensitivity variants, though only by 0.1 points when beds cost as much as a nurse. |
-| Coupling fixed and movable resources matters | Only sometimes. No measurable difference at base assumptions; 1.8 points better when the pump fleet is tight, 0.8 when beds are expensive. |
-| CVaR risk term protects bad weeks | Not shown. Worst-10%-week cost was within 0.5% of the expected-cost plan. |
-| Choose forecasters by decisions, not error | Partly. CRPS ranked models exactly like regret; MAE nearly so. Picking by regret did not change the test-year result, but regret-tuning the scenario spread helped the weaker models. |
-| Learn from administrator overrides | Works on a simulated administrator: overrides 48% smaller after learning; recovered weights near the hidden ones. Needs real override logs to confirm. |
+| Forecast-then-allocate with uncertainty beats point forecasts | Yes. Regret 12.3% vs 16.6% for the best method that ignores uncertainty (26% lower); 10.1% vs 13.6% in a stress-wave year. Held in all seven sensitivity variants (smallest margin 0.2 points, when beds cost as much as a nurse) and in 5 of 5 simulated hospitals (mean 10.7% vs 14.1%). |
+| Coupling fixed and movable resources matters | Yes, but the gain is small. Joint planning was 2.3 per week cheaper than planning one resource after another (95% CI 0.6 to 4.0), 5.5 per week in the stress year, and better in 5 of 5 hospitals (mean 0.9 regret points). The gain grows to 3.1 points when the pump fleet is tight and disappears when patients cannot outlie to other units. |
+| CVaR risk term protects bad weeks | Not shown. Worst-10%-week cost matched the expected-cost plan, and the CVaR term added 0.4 regret points on average across the five hospitals. |
+| Choose forecasters by decisions, not error | Partly. CRPS ranked models exactly like regret; MAE nearly so (rank correlation 0.90). Picking by regret did not change the test-year result (+0.2 per week, 95% CI -2.4 to +2.7). Tuning the scenario spread by regret chose wider scenarios for the weakest model. |
+| Learn from administrator overrides | Works on a simulated administrator: overrides 43% smaller after learning; recovered weights (2.0, 0.6) near the hidden (1.8, 0.5). Needs real override logs to confirm. |
 | Offline, low-cost | A weekly plan takes about 3 seconds on a 4-core CPU; no GPU, no network. |
+
+v1.1 added patient overflow between units. It lowered the headline gain from 41% (v1) to 26%, because without overflow the model overstated shortages for plans that left one unit full while another had spare beds.
 
 ## Status and next steps
 
-v1 implements the plan of record end to end on synthetic data. Next: run on real aggregate data (NHS England sitreps, MIMIC-IV, or a partner hospital), widen the cost sweep, and pilot the app in advisory mode.
+v1.1 implements the plan of record end to end on synthetic data, with patient overflow between units and a five-hospital replication. Next: run on real aggregate data (NHS England sitreps, MIMIC-IV, or a partner hospital), widen the cost sweep, and pilot the app in advisory mode.
