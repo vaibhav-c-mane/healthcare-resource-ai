@@ -40,7 +40,7 @@ src/hcalloc/
   overrides/             override learner and simulated administrator
   service.py             planning service and local SQLite decision log
   app/streamlit_app.py   offline planning app
-  experiments.py         the three benchmark experiments
+  experiments.py         the four benchmark experiments
   report.py              figures and REPORT.md
 docs/                    assumptions and data guide
 results/                 outputs of `hcalloc experiments` (synthetic)
@@ -62,4 +62,4 @@ One 52-week test year, a plan every Sunday, scored against perfect foresight. Fu
 
 ## Status and next steps
 
-v1 implements the plan of record end to end on synthetic data. Next: run on real aggregate data (MIMIC-IV or a partner hospital), sweep the cost assumptions, add patient overflow between units, and pilot the app in advisory mode.
+v1 implements the plan of record end to end on synthetic data. Next: run on real aggregate data (MIMIC-IV or a partner hospital), repeat with more seeds, widen the cost sweep, add patient overflow between units, and pilot the app in advisory mode.
