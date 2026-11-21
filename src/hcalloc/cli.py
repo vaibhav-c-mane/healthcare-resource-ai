@@ -47,6 +47,24 @@ def main(argv=None) -> int:
 
     sub.add_parser("app", help="launch the offline planning app (needs the 'app' extra)")
 
+    ne = sub.add_parser("network-experiments", help="v2: bed reserves and transfers across hospitals (E1-E3)")
+    ne.add_argument("--out", default="results/network")
+    ne.add_argument("--sitrep-csv", default=None,
+                    help="G&A sitrep cache from `hcalloc network-sitrep-cache` (adds the real NHS networks)")
+    ne.add_argument("--quick", action="store_true", help="1 seed, 6 weeks, small sweep: a smoke test")
+    ne.add_argument("--workers", type=int, default=4)
+
+    nc = sub.add_parser("network-sitrep-cache", help="read the sitrep workbooks once into a G&A CSV cache")
+    nc.add_argument("--files", nargs="+", default=None)
+    nc.add_argument("--out", default="data/sitrep/ga_long.csv")
+
+    nr = sub.add_parser("network-report", help="write REPORT.md and figures for results/network")
+    nr.add_argument("--out", default="results/network")
+
+    db = sub.add_parser("dashboard", help="v2: launch the bed dashboard and JSON API (needs the 'dashboard' extra)")
+    db.add_argument("--host", default="127.0.0.1")
+    db.add_argument("--port", type=int, default=8000)
+
     a = p.parse_args(argv)
     if a.cmd == "simulate":
         from .data.synthetic import StressWave, simulate_hospital
@@ -95,6 +113,38 @@ def main(argv=None) -> int:
 
         rebuild(a.out)
         print(f"rebuilt {a.out}/REPORT.md")
+    elif a.cmd == "network-experiments":
+        from .network.experiments import NetworkRunConfig, run_all as run_network
+        from .network.report import write_report
+
+        rc = NetworkRunConfig(workers=a.workers)
+        if a.quick:
+            rc = NetworkRunConfig(workers=a.workers, seeds=(0,), max_weeks=6, sweep_transfer_cost=(1.5,),
+                                  sweep_cap_share=(0.0, 0.02))
+        run_network(a.out, rc, ga_csv=a.sitrep_csv)
+        write_report(a.out)
+        print(f"wrote {a.out}/REPORT.md")
+    elif a.cmd == "network-sitrep-cache":
+        from .data.loaders import SITREP_SHEETS, clean_sitreps, load_uec_sitreps
+
+        files = a.files or sorted(Path("data/sitrep").glob("*.xlsx"))
+        if not files:
+            print("no sitrep workbooks found; run `hcalloc sitrep-fetch` first", file=sys.stderr)
+            return 1
+        ga = clean_sitreps(load_uec_sitreps(files, sheets={"G&A": SITREP_SHEETS["G&A"]}))
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        ga.to_csv(a.out, index=False)
+        print(f"wrote {len(ga)} rows to {a.out}")
+    elif a.cmd == "network-report":
+        from .network.report import write_report
+
+        write_report(a.out)
+        print(f"wrote {a.out}/REPORT.md")
+    elif a.cmd == "dashboard":
+        import uvicorn
+
+        print(f"bed dashboard on http://{a.host}:{a.port}  (JSON at /api/plan)")
+        uvicorn.run("hcalloc.network.api:app", host=a.host, port=a.port)
     elif a.cmd == "app":
         app = Path(__file__).parent / "app" / "streamlit_app.py"
         return subprocess.call([sys.executable, "-m", "streamlit", "run", str(app)])

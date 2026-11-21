@@ -4,6 +4,18 @@ Forecast hospital demand as a probability distribution, then use that distributi
 
 > **Data notice.** The results in `results/` come from a semi-synthetic hospital simulator, not a real hospital. See [docs/data.md](docs/data.md) for how to plug in real data and [docs/assumptions.md](docs/assumptions.md) for every assumed value.
 
+## v2: beds across a network of hospitals
+
+v2 plans **one resource, open beds, for several hospitals at once**. For each hospital it forecasts occupied beds for the next 7 days, keeps a reserve of open beds, and plans patient transfers to other hospitals at a fixed cost and up to a fixed number per day. Nurses and equipment stay in the v1 planner below and are future scope for the network version.
+
+- Code: `src/hcalloc/network/`. Tests: `tests/test_network.py`.
+- Bed dashboard and JSON API for the EDI React app: `hcalloc dashboard`, then http://127.0.0.1:8000 (needs `pip install -e ".[dashboard]"`).
+- Experiments E1 (policy comparison), E2 (local, simultaneous and near-capacity surges) and E3 (transfer cost and cap sweep), on a SYNTHETIC 3-hospital network and on two real NHS networks (Tyne and Wear; Greater Manchester): `hcalloc network-experiments --sitrep-csv data/sitrep/ga_long.csv`. Results: [results/network/REPORT.md](results/network/REPORT.md).
+- Perfect foresight, the regret benchmark, obeys the same beds, transfer cap and costs as every policy.
+- How to run on Windows, connect to React, and next steps for the paper: [docs/HANDOVER.md](docs/HANDOVER.md).
+
+## v1: one hospital, beds + nurses + equipment
+
 ## What it does
 
 1. **Forecast** each unit's census for the next 7 days with one of five models: seasonal naive, Holt-Winters, gradient-boosted trees, negative binomial regression, or a stock-and-flow model of admissions and discharges.
