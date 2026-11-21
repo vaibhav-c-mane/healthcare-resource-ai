@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bed planning dashboard</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1d1d1b; --muted:#6b6b66; --line:#d9d8d2; --band:#cfe0f5; --median:#2563a8;
+          --open:#1f7a4d; --cap:#b42318; --warn:#fff4e5; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:20px 24px 8px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; }
+  .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:8px 24px 16px; }
+  input[type=date], button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { cursor:pointer; }
+  main { padding:0 24px 32px; display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card h2 { font-size:17px; margin:0 0 2px; }
+  .kpis { display:flex; gap:16px; margin:8px 0; font-size:13px; color:var(--muted); flex-wrap:wrap; }
+  .kpis b { color:var(--ink); font-size:16px; display:block; }
+  svg { width:100%; height:auto; display:block; }
+  ul.reasons { margin:8px 0 0; padding-left:18px; font-size:13px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; margin-top:8px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .wide { grid-column:1 / -1; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); flex-wrap:wrap; }
+  .sw { display:inline-block; width:14px; height:3px; vertical-align:middle; margin-right:4px; }
+  .note { background:var(--warn); border-radius:8px; padding:8px 12px; font-size:13px; }
+  .err { color:var(--cap); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bed planning across hospitals</h1>
+  <div class="sub" id="meta">Loading…</div>
+</header>
+<div class="bar">
+  <label>Plan the 7 days after <input type="date" id="date"></label>
+  <button id="go">Update</button>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--band);height:10px"></span>likely range (10th to 90th percentile)</span>
+    <span><span class="sw" style="background:var(--median)"></span>median forecast</span>
+    <span><span class="sw" style="background:var(--open)"></span>recommended open beds</span>
+    <span><span class="sw" style="background:var(--cap)"></span>physical beds</span>
+  </div>
+</div>
+<main id="cards"></main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function chart(h) {
+  const W = 340, H = 170, L = 40, R = 10, T = 10, B = 24;
+  const d = h.days, n = d.length;
+  const lo = Math.min(...d.map(x => x.p10)) * 0.97, hi = Math.max(h.beds, ...d.map(x => x.p90), ...d.map(x => x.open_beds)) * 1.02;
+  const x = i => L + (W - L - R) * i / (n - 1), y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const band = d.map((p, i) => `${x(i)},${y(p.p90)}`).join(' ') + ' ' + d.map((p, i) => `${x(n - 1 - i)},${y(d[n - 1 - i].p10)}`).join(' ');
+  const line = k => d.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p[k])}`).join('');
+  const ticks = [lo, (lo + hi) / 2, hi].map(v => `<text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#6b6b66">${Math.round(v)}</text>`).join('');
+  const days = d.map((p, i) => `<text x="${x(i)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="#6b6b66">${new Date(p.date).toLocaleDateString('en-GB', {weekday: 'short'})}</text>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Forecast and plan for ${esc(h.name)}">
+    <polygon points="${band}" fill="var(--band)"/>
+    <line x1="${L}" x2="${W - R}" y1="${y(h.beds)}" y2="${y(h.beds)}" stroke="var(--cap)" stroke-dasharray="4 3"/>
+    <path d="${line('p50')}" fill="none" stroke="var(--median)" stroke-width="2"/>
+    <path d="${line('open_beds')}" fill="none" stroke="var(--open)" stroke-width="2"/>
+    ${ticks}${days}</svg>`;
+}
+
+function render(r) {
+  $('#meta').innerHTML = `Planned on ${esc(r.planned_on)} · data: <b>${esc(r.data)}</b> · costs: open bed-day ${r.costs.open_bed_day}, transfer ${r.costs.transfer}, unplaced patient-day ${r.costs.unplaced_patient_day}`;
+  const cards = r.hospitals.map(h => {
+    const t = h.days[0];
+    return `<section class="card"><h2>${esc(h.name)}</h2>
+      <div class="kpis"><span><b>${h.beds}</b>beds</span><span><b>${h.occupied_today ?? '–'}</b>occupied today</span>
+      <span><b>${t.open_beds}</b>open tomorrow</span><span><b>${t.reserve >= 0 ? '+' : ''}${t.reserve}</b>reserve tomorrow</span>
+      <span><b>${h.transfer_cap_per_day}</b>max transfers out / day</span></div>
+      ${chart(h)}
+      <ul class="reasons">${h.reasons.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`;
+  }).join('');
+  const rows = r.transfers.length ? r.transfers.map(t => `<tr><td>${esc(t.date)}</td><td>${esc(t.from)}</td><td>${esc(t.to)}</td><td>${t.expected_patients}</td><td>${esc(t.reason)}</td></tr>`).join('')
+    : '<tr><td colspan="5">No transfers expected this week.</td></tr>';
+  const plan = `<section class="card wide"><h2>Recommended reserves, next 7 days</h2><table><thead><tr><th>Hospital</th>${r.hospitals[0].days.map(d => `<th>${esc(d.date.slice(5))}</th>`).join('')}</tr></thead><tbody>
+    ${r.hospitals.map(h => `<tr><td>${esc(h.name)}</td>${h.days.map(d => `<td>${d.open_beds} open<br><span class="sub">median ${Math.round(d.p50)}, reserve ${d.reserve >= 0 ? '+' : ''}${d.reserve}</span></td>`).join('')}</tr>`).join('')}
+    </tbody></table></section>`;
+  const tr = `<section class="card wide"><h2>Suggested transfers</h2><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Expected patients</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">${r.notes.map(esc).join(' ')}</p></section>`;
+  $('#cards').innerHTML = cards + plan + tr;
+}
+
+async function load(date) {
+  $('#cards').innerHTML = '<p class="sub">Planning…</p>';
+  const res = await fetch('/api/plan' + (date ? `?date=${date}` : ''));
+  const body = await res.json();
+  if (!res.ok) { $('#cards').innerHTML = `<p class="err">${esc(body.detail || 'error')}</p>`; return; }
+  render(body);
+}
+
+(async () => {
+  const r = await (await fetch('/api/range')).json();
+  const el = $('#date'); el.min = r.first; el.max = r.last; el.value = r.default;
+  $('#go').onclick = () => load(el.value);
+  load(r.default);
+})();
+</script>
+</body>
+</html>

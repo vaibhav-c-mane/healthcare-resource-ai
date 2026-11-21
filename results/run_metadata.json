@@ -273,6 +273,29 @@
     "float_pool": 4,
     "pump_fleet": 150,
     "pump_moves_max": 20,
+    "overflow": [
+      [
+        "Medical",
+        "Surgical"
+      ],
+      [
+        "Surgical",
+        "Medical"
+      ],
+      [
+        "Medical",
+        "StepDown"
+      ],
+      [
+        "Surgical",
+        "StepDown"
+      ],
+      [
+        "StepDown",
+        "ICU"
+      ]
+    ],
+    "outlier_cost": 1.0,
     "nurse_cost": 1.0,
     "agency_cost": 2.0,
     "nurse_move_cost": 0.15,
@@ -291,6 +314,12 @@
     "stress_start": "2023-10-01",
     "workers": 4,
     "max_weeks": null,
+    "replication_seeds": [
+      1,
+      2,
+      3,
+      4
+    ],
     "settings": {
       "risk_weight": 0.3,
       "cvar_alpha": 0.9,
@@ -328,7 +357,7 @@
     ],
     "regret": [
       "negbin_glm",
-      1.0
+      0.75
     ],
     "spearman_mae_vs_regret": 0.8999999999999998,
     "spearman_crps_vs_regret": 0.9999999999999999
@@ -337,5 +366,5 @@
     1.8,
     0.5
   ],
-  "runtime_seconds": 731.6
+  "runtime_seconds": 1415.2
 }

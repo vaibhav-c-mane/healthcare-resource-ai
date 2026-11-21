@@ -13,7 +13,7 @@ from ..allocate.baselines import make_plan
 from ..allocate.model import cvar, solve_allocation
 from ..config import HospitalConfig, PlanSettings
 from ..data.series import DailySeries
-from ..forecast.models import Forecaster, SeasonalNaive, actuals
+from ..forecast.models import Forecaster, SeasonalNaive, actuals, valid_origins
 from ..forecast.scenarios import ConformalScenarios, crps_ensemble, interval_coverage
 from .outcome import TRUE_COST, evaluate_plan, oracle
 
@@ -51,6 +51,38 @@ def standard_phases(series: DailySeries, horizon: int = 7) -> dict[str, Phase]:
         "test": Phase("test", series.year_indices(y[2])[-1], daily_origins(series, y[3], horizon),
                       weekly_origins(series, y[4], horizon)),
     }
+
+
+def season_phases(series: DailySeries, horizon: int = 7, history: int = 28, weekday: int = 6) -> dict[str, Phase]:
+    """Season splits for winter-only data such as NHS sitreps, mirroring ``standard_phases``.
+
+    Each observed run of days is one season S1..Sn (n >= 3); the last three are used.
+    Select on S(n-1): fit on seasons up to S(n-3), calibrate on S(n-2). Test on Sn: fit
+    up to S(n-2), calibrate on S(n-1). Earlier seasons are always in the fit. Origins
+    need ``history`` observed days behind them, so the first weeks of each season are
+    history only. Calibration uses every valid day, evaluation every valid ``weekday``.
+    """
+    runs = series.segments()
+    if len(runs) < 3:
+        raise ValueError(f"season_phases needs at least three seasons (observed runs), found {len(runs)}")
+
+    def origins(run, weekly):
+        a, b = run
+        idx = valid_origins(series, np.arange(a, b + 1), horizon, history)
+        return idx[series.dates[idx].dayofweek == weekday] if weekly else idx
+
+    s = runs[-3:]
+    fit_select = runs[-4][1] if len(runs) >= 4 else None
+    phases = {"test": Phase("test", s[0][1], origins(s[1], False), origins(s[2], True))}
+    if fit_select is not None:
+        phases["select"] = Phase("select", fit_select, origins(s[0], False), origins(s[1], True))
+    else:
+        # three seasons: select by fitting and calibrating within S1 (first and second half)
+        a, b = s[0]
+        mid = (a + b) // 2
+        cal = origins(s[0], False)
+        phases["select"] = Phase("select", mid, cal[cal > mid], origins(s[1], True))
+    return {"select": phases["select"], "test": phases["test"]}
 
 
 @dataclass
