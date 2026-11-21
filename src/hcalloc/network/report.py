@@ -22,6 +22,30 @@ LABELS = {
     "p80": "80th percentile buffer",
 }
 ORDER = list(LABELS)
+
+# Written by hand after the 2026-11-22 run; update when the experiments change.
+KEY_FINDINGS = """\
+1. **The transfer network is worth a lot, and more as the daily cap grows.** Against hospitals that never transfer, the
+   coordinated plan saved 21 to 57 cost units per week on the simulated network and 163 to 190 per week on the two NHS
+   networks, roughly halving unmet bed-days on NHS data (317 vs 580 in Tyne and Wear, 301 vs 610 in Greater Manchester).
+   The saving grows with the transfer cap and shrinks as transfers cost more (E3).
+2. **Synchronised surges shrink the value of the network.** With the same surges hitting one hospital at a time the
+   network saved 46 per week; when they hit all hospitals together it saved 21 per week, and unmet bed-days rose two- to
+   threefold for the forecast-driven policies. Spare beds next door are not there when everyone is busy.
+3. **Planning with uncertainty is essential.** The same planner fed only a point forecast had 2 to 8 times more unmet
+   bed-days and cost 200 to 260 per week more (simulated) and 490 to 750 per week more (NHS).
+4. **The 85% occupancy rule leaves the fewest patients unplaced, but at a high price**: 2 to 5 times the idle open
+   bed-days and 6 to 15% regret, against 3 to 8% for the forecast-driven policies. In simultaneous-surge weeks its
+   spare beds paid off and it had the lowest cost, which is a further sign that the forecasts under-predict synchronised surges.
+5. **Anticipating transfers inside the plan did not beat planning each hospital alone and transferring on the day.**
+   The difference was within noise in most settings and on both NHS networks. Under simultaneous surges, planning alone
+   was better (by 9 per week overall, 39 per week in surge weeks), because the coordinated plan opens fewer beds and
+   counts on neighbours who turn out to be full. Joint scenarios reduce this (they beat independent scenarios by 51 per
+   week in simultaneous-surge weeks) but do not remove it.
+
+Taken together: the network and the uncertainty-aware forecast carry most of the value; relying on neighbours in the
+plan itself only pays when surges are not synchronised and scenarios capture how hospitals move together. That is the
+'when does it help' answer the paper can build on, with the limits below."""
 REGIME_TEXT = {
     "baseline": "Baseline (two random local surges a year)",
     "local": "Local surges (one hospital at a time)",
@@ -61,7 +85,7 @@ def _bars(df: pd.DataFrame, labels: list[str], path: Path, title: str) -> None:
         for i, p in enumerate(pols):
             vals = [float(df[(df.label == l) & (df.policy == p)][col].sum()) for l in labels]
             ax.bar(x + (i - len(pols) / 2 + 0.5) * width, vals, width, label=LABELS[p])
-        ax.set_xticks(x, [REGIME_TEXT.get(l, l).split(" (")[0] for l in labels], fontsize=8)
+        ax.set_xticks(x, [REGIME_TEXT.get(l, l).split(" (")[0].replace(" ", "\n", 1) for l in labels], fontsize=8)
         ax.set_title(name, fontsize=10)
         ax.spines[["top", "right"]].set_visible(False)
     axes[1].legend(fontsize=7, frameon=False, loc="upper left", bbox_to_anchor=(1.0, 1.0))
@@ -113,6 +137,10 @@ def write_report(out: str | Path = "results/network") -> Path:
         "> **Data notice.** The simulated network is SYNTHETIC. The NHS networks use real adult general and acute (G&A) "
         "beds occupied from NHS England daily sitreps (Open Government Licence v3.0); bed counts are the most beds the "
         "trust opened before the test winter. Costs, transfer caps and the 'one transfer = one bed-day' rule are assumptions.",
+        "",
+        "## Key findings",
+        "",
+        KEY_FINDINGS,
         "",
         "## Setup",
         "",

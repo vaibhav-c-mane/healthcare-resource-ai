@@ -1,0 +1,263 @@
+{
+  "simulated": [
+    {
+      "regime": "baseline",
+      "seed": 0,
+      "forecaster": "holt_winters",
+      "select_mae": 6.457578614550102,
+      "test_mae": 5.758063071511355
+    },
+    {
+      "regime": "baseline",
+      "seed": 1,
+      "forecaster": "gbm",
+      "select_mae": 5.630946132934895,
+      "test_mae": 6.2491750170758085
+    },
+    {
+      "regime": "baseline",
+      "seed": 2,
+      "forecaster": "holt_winters",
+      "select_mae": 6.070143459571307,
+      "test_mae": 5.250841390351593
+    },
+    {
+      "regime": "baseline",
+      "seed": 3,
+      "forecaster": "gbm",
+      "select_mae": 6.3341174737090995,
+      "test_mae": 5.471485282377643
+    },
+    {
+      "regime": "baseline",
+      "seed": 4,
+      "forecaster": "gbm",
+      "select_mae": 6.034465248081102,
+      "test_mae": 5.856644149829894
+    },
+    {
+      "regime": "local",
+      "seed": 0,
+      "forecaster": "holt_winters",
+      "select_mae": 6.457578614550102,
+      "test_mae": 6.212827908498392
+    },
+    {
+      "regime": "local",
+      "seed": 1,
+      "forecaster": "gbm",
+      "select_mae": 5.630946132934895,
+      "test_mae": 6.29217135715492
+    },
+    {
+      "regime": "local",
+      "seed": 2,
+      "forecaster": "holt_winters",
+      "select_mae": 6.070143459571307,
+      "test_mae": 5.834092635101321
+    },
+    {
+      "regime": "local",
+      "seed": 3,
+      "forecaster": "gbm",
+      "select_mae": 6.3341174737090995,
+      "test_mae": 5.875267992271317
+    },
+    {
+      "regime": "local",
+      "seed": 4,
+      "forecaster": "gbm",
+      "select_mae": 6.034465248081102,
+      "test_mae": 6.0465239018665216
+    },
+    {
+      "regime": "simultaneous",
+      "seed": 0,
+      "forecaster": "holt_winters",
+      "select_mae": 6.457578614550102,
+      "test_mae": 7.836144938643949
+    },
+    {
+      "regime": "simultaneous",
+      "seed": 1,
+      "forecaster": "gbm",
+      "select_mae": 5.630946132934895,
+      "test_mae": 8.14236928578987
+    },
+    {
+      "regime": "simultaneous",
+      "seed": 2,
+      "forecaster": "holt_winters",
+      "select_mae": 6.070143459571307,
+      "test_mae": 7.445363450400481
+    },
+    {
+      "regime": "simultaneous",
+      "seed": 3,
+      "forecaster": "gbm",
+      "select_mae": 6.3341174737090995,
+      "test_mae": 7.537901993762253
+    },
+    {
+      "regime": "simultaneous",
+      "seed": 4,
+      "forecaster": "gbm",
+      "select_mae": 6.034465248081102,
+      "test_mae": 7.80401272996989
+    },
+    {
+      "regime": "near_capacity",
+      "seed": 0,
+      "forecaster": "holt_winters",
+      "select_mae": 7.201678824725303,
+      "test_mae": 6.697082643027191
+    },
+    {
+      "regime": "near_capacity",
+      "seed": 1,
+      "forecaster": "gbm",
+      "select_mae": 6.328941010380479,
+      "test_mae": 6.612895753977569
+    },
+    {
+      "regime": "near_capacity",
+      "seed": 2,
+      "forecaster": "holt_winters",
+      "select_mae": 6.731551733863145,
+      "test_mae": 5.852178907740377
+    },
+    {
+      "regime": "near_capacity",
+      "seed": 3,
+      "forecaster": "gbm",
+      "select_mae": 7.078265557395346,
+      "test_mae": 6.092684111481775
+    },
+    {
+      "regime": "near_capacity",
+      "seed": 4,
+      "forecaster": "gbm",
+      "select_mae": 6.6450579427191965,
+      "test_mae": 6.212110003625195
+    }
+  ],
+  "config": {
+    "horizon": 7,
+    "n_scenarios": 40,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "regimes": [
+      "baseline",
+      "local",
+      "simultaneous",
+      "near_capacity"
+    ],
+    "cap_share": 0.02,
+    "open_cost": 1.0,
+    "transfer_cost": 1.5,
+    "unmet_cost": 8.0,
+    "sweep_transfer_cost": [
+      0.5,
+      1.5,
+      3.0,
+      6.0
+    ],
+    "sweep_cap_share": [
+      0.0,
+      0.01,
+      0.02,
+      0.05
+    ],
+    "workers": 4,
+    "max_weeks": null
+  },
+  "spec": {
+    "names": [
+      "Hospital A",
+      "Hospital B",
+      "Hospital C"
+    ],
+    "beds": [
+      150,
+      250,
+      400
+    ],
+    "occupancy": 0.85,
+    "winter_amplitude": 0.06,
+    "weekend_dip": 0.03,
+    "noise_sd": 0.03,
+    "ar": 0.8,
+    "rho": 0.5,
+    "surge_size": 0.2,
+    "surge_days": 21,
+    "surges_per_year": 2,
+    "test_surges": 4,
+    "years": 5,
+    "start": "2020-01-01"
+  },
+  "nhs": [
+    {
+      "network": "tyne_and_wear",
+      "trusts": {
+        "RTD": "The Newcastle Upon Tyne Hospitals NHS Foundation Trust",
+        "RR7": "Gateshead Health NHS Foundation Trust",
+        "R0B": "South Tyneside and Sunderland NHS Foundation Trust"
+      },
+      "beds": {
+        "RTD": 1310,
+        "RR7": 506,
+        "R0B": 1142
+      },
+      "transfer_cap_per_day": {
+        "RTD": 26,
+        "RR7": 10,
+        "R0B": 23
+      },
+      "mean_test_occupancy": {
+        "RTD": 0.884,
+        "RR7": 0.87,
+        "R0B": 0.871
+      },
+      "test_weeks": 14,
+      "test_from": "2024-12-22",
+      "test_to": "2025-03-23",
+      "forecaster": "holt_winters",
+      "select_mae": 26.907451572686032,
+      "test_mae": 23.51265049705925
+    },
+    {
+      "network": "greater_manchester",
+      "trusts": {
+        "RM3": "Northern Care Alliance NHS Ft",
+        "RMC": "Bolton NHS Foundation Trust",
+        "RRF": "Wrightington, Wigan and Leigh NHS Foundation Trust"
+      },
+      "beds": {
+        "RM3": 1587,
+        "RMC": 569,
+        "RRF": 453
+      },
+      "transfer_cap_per_day": {
+        "RM3": 32,
+        "RMC": 11,
+        "RRF": 9
+      },
+      "mean_test_occupancy": {
+        "RM3": 0.86,
+        "RMC": 0.918,
+        "RRF": 0.941
+      },
+      "test_weeks": 14,
+      "test_from": "2024-12-22",
+      "test_to": "2025-03-23",
+      "forecaster": "holt_winters",
+      "select_mae": 15.47448736300791,
+      "test_mae": 15.584270301958382
+    }
+  ]
+}
