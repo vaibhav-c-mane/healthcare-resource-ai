@@ -13,7 +13,7 @@ Run **one line at a time** and wait for the prompt to come back before the next 
 ```
 cd "C:\Users\Admin\OneDrive\Desktop\EDI_final project"
 ```
-Extract `hcalloc-v2.zip` here, then:
+Extract `hcalloc-v2.zip` here (or clone from GitHub, see section 4), then:
 ```
 cd hcalloc
 ```
@@ -83,17 +83,17 @@ The `/api/plan` answer looks like this (shortened):
 
 Suggested React screens: one card per hospital (a chart of p10 to p90 as a band, p50 as a line, `open_beds` as a second line, `beds` as a dashed limit), a 7-day reserves table, and a transfers table with the `reason` column. The bundled page `src/hcalloc/network/dashboard.html` is a working reference for all three.
 
-## 4. Put it on GitHub
+## 4. GitHub
 
-Claude could not reach your GitHub repository from its environment, so v2 is delivered as a zip. The zip's `hcalloc` folder is a git repository on a branch named `feature/v2-network-beds`, built on top of your GitHub `main` (after pull request #1). Sign in to GitHub as **vaibhav-c-mane**, then run one line at a time:
+v2 is on GitHub: the code was merged in pull request #4, and the results are in pull request #5. To get the latest version on your computer:
 
 ```
-cd hcalloc
+git clone https://github.com/vaibhav-c-mane/healthcare-resource-ai.git
 ```
 ```
-git push -u origin feature/v2-network-beds
+cd healthcare-resource-ai
 ```
-If Git asks you to sign in, use the vaibhav-c-mane account. Then open https://github.com/vaibhav-c-mane/healthcare-resource-ai and click **Compare & pull request** for `feature/v2-network-beds`, then **Create pull request**, then **Merge**. The branch already contains the work from the open pull requests #2 (NHS data) and #3 (v1.1 results), so after merging you can close those two.
+Then follow section 2 from `python -m venv .venv`. To update a copy you already have, run `git pull` inside it.
 
 ## 5. Code map (v2 parts)
 

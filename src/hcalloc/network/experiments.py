@@ -145,11 +145,19 @@ def _sim_task(args):
     return df, (pd.concat(sweep) if sweep else None), meta
 
 
+def _single_thread_worker() -> None:
+    """Each worker process uses one thread. Several processes each starting one thread per core
+    (scikit-learn's OpenMP) oversubscribe the CPU and can slow gradient boosting down a thousandfold."""
+    from threadpoolctl import threadpool_limits
+
+    threadpool_limits(1)
+
+
 def run_simulated(rc: NetworkRunConfig, log=print) -> tuple[pd.DataFrame, pd.DataFrame, list]:
     tasks = [(r, s, rc) for r in rc.regimes for s in rc.seeds]
     t0 = time.time()
     if rc.workers > 1:
-        with ProcessPoolExecutor(rc.workers) as ex:
+        with ProcessPoolExecutor(rc.workers, initializer=_single_thread_worker) as ex:
             res = list(ex.map(_sim_task, tasks))
     else:
         res = [_sim_task(t) for t in tasks]

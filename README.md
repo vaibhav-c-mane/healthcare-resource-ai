@@ -12,6 +12,7 @@ v2 plans **one resource, open beds, for several hospitals at once**. For each ho
 - Bed dashboard and JSON API for the EDI React app: `hcalloc dashboard`, then http://127.0.0.1:8000 (needs `pip install -e ".[dashboard]"`).
 - Experiments E1 (policy comparison), E2 (local, simultaneous and near-capacity surges) and E3 (transfer cost and cap sweep), on a SYNTHETIC 3-hospital network and on two real NHS networks (Tyne and Wear; Greater Manchester): `hcalloc network-experiments --sitrep-csv data/sitrep/ga_long.csv`. Results: [results/network/REPORT.md](results/network/REPORT.md).
 - Perfect foresight, the regret benchmark, obeys the same beds, transfer cap and costs as every policy.
+- Headline results (details and confidence intervals in the report): the transfer network roughly halves unmet bed-days on both NHS networks compared with hospitals that never transfer, and its value shrinks when surges hit all hospitals at once; planning on a point forecast instead of scenarios is far worse; the 85% rule leaves 2 to 5 times more beds idle; and building expected transfers into the plan did not beat planning each hospital alone and transferring on the day.
 - How to run on Windows, connect to React, and next steps for the paper: [docs/HANDOVER.md](docs/HANDOVER.md).
 
 ## v1: one hospital, beds + nurses + equipment
