@@ -1,0 +1,683 @@
+{
+  "data": {
+    "kind": "real occupancy (NHS England UEC daily sitreps); staffing, pumps and costs assumed",
+    "source": "NHS England, Urgent and Emergency Care Daily Situation Reports, Web File Timeseries",
+    "files": {
+      "2021-22": "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2022/04/UEC-Daily-SitRep-Web-File-Timeseries.xlsx",
+      "2022-23": "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2023/04/UEC-Daily-SitRep-Web-File-Timeseries.xlsx",
+      "2023-24": "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2024/04/Web-File-Timeseries-UEC-Daily-SitRep.xlsx",
+      "2024-25": "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2025/04/Web-File-Timeseries-UEC-Daily-SitRep.xlsx"
+    },
+    "licence": "Open Government Licence v3.0"
+  },
+  "assumptions": {
+    "patients_per_nurse": {
+      "ICU": 1.5,
+      "G&A": 6.0
+    },
+    "pumps_per_patient": {
+      "ICU": 3.0,
+      "G&A": 0.5
+    },
+    "shortage_cost": {
+      "ICU": 12.0,
+      "G&A": 6.0
+    },
+    "surge_share": {
+      "ICU": 0.1,
+      "G&A": 0.05
+    },
+    "agency_share": {
+      "ICU": 0.15,
+      "G&A": 0.05
+    },
+    "nurse_pool_factor": 1.1,
+    "float_share": 0.08,
+    "pump_fleet_factor": 1.05,
+    "pump_move_share": 0.1
+  },
+  "run_config": {
+    "trusts": [
+      "RA9",
+      "RNA",
+      "RTD"
+    ],
+    "horizon": 7,
+    "n_scenarios": 40,
+    "seed": 0,
+    "scales": [
+      0.75,
+      1.0,
+      1.25,
+      1.5
+    ],
+    "workers": 4,
+    "settings": {
+      "risk_weight": 0.3,
+      "cvar_alpha": 0.9,
+      "shortage_multiplier": 1.0,
+      "time_limit": 60.0,
+      "mip_gap": 0.005
+    },
+    "assumptions": {
+      "patients_per_nurse": {
+        "ICU": 1.5,
+        "G&A": 6.0
+      },
+      "pumps_per_patient": {
+        "ICU": 3.0,
+        "G&A": 0.5
+      },
+      "shortage_cost": {
+        "ICU": 12.0,
+        "G&A": 6.0
+      },
+      "surge_share": {
+        "ICU": 0.1,
+        "G&A": 0.05
+      },
+      "agency_share": {
+        "ICU": 0.15,
+        "G&A": 0.05
+      },
+      "nurse_pool_factor": 1.1,
+      "float_share": 0.08,
+      "pump_fleet_factor": 1.05,
+      "pump_move_share": 0.1
+    }
+  },
+  "trusts": {
+    "RA9": {
+      "provenance": {
+        "kind": "real (NHS England UEC daily sitrep)",
+        "trust_code": "RA9",
+        "trust_name": "Torbay and South Devon NHS Foundation Trust",
+        "census": "beds occupied at 8am snapshot",
+        "units": {
+          "ICU": "Adult critical care",
+          "G&A": "Adult G&A beds"
+        },
+        "days_published": 525,
+        "days_filled": 0,
+        "days_dropped": 0,
+        "values_cleaned": 0,
+        "licence": "Open Government Licence v3.0"
+      },
+      "hospital": {
+        "units": [
+          {
+            "name": "ICU",
+            "beds": 10,
+            "surge_beds": 1,
+            "patients_per_nurse": 1.5,
+            "pumps_per_patient": 3.0,
+            "shortage_cost": 12.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 1,
+            "float_ok": false
+          },
+          {
+            "name": "G&A",
+            "beds": 393,
+            "surge_beds": 20,
+            "patients_per_nurse": 6.0,
+            "pumps_per_patient": 0.5,
+            "shortage_cost": 6.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 4,
+            "float_ok": true
+          }
+        ],
+        "nurse_moves": [
+          [
+            "ICU",
+            "G&A"
+          ]
+        ],
+        "nurse_pool_max": 80,
+        "float_pool": 7,
+        "pump_fleet": 238,
+        "pump_moves_max": 24,
+        "overflow": [],
+        "outlier_cost": 1.0,
+        "nurse_cost": 1.0,
+        "agency_cost": 2.0,
+        "nurse_move_cost": 0.15,
+        "pump_move_cost": 0.1
+      },
+      "seasons": [
+        [
+          "2021-11-29",
+          "2022-04-03"
+        ],
+        [
+          "2022-11-14",
+          "2023-04-02"
+        ],
+        [
+          "2023-11-20",
+          "2024-03-31"
+        ],
+        [
+          "2024-11-25",
+          "2025-03-30"
+        ]
+      ],
+      "phases": {
+        "select": {
+          "fit_end": "2022-04-03",
+          "calibration": [
+            "2022-12-11",
+            "2023-03-26"
+          ],
+          "calibration_origins": 106,
+          "evaluation": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "evaluation_weeks": 15
+        },
+        "test": {
+          "fit_end": "2023-04-02",
+          "calibration": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "calibration_origins": 99,
+          "evaluation": [
+            "2024-12-22",
+            "2025-03-23"
+          ],
+          "evaluation_weeks": 14
+        }
+      },
+      "choice": {
+        "mae": [
+          "gbm",
+          1.0
+        ],
+        "crps": [
+          "gbm",
+          1.0
+        ],
+        "regret": [
+          "gbm",
+          1.0
+        ],
+        "spearman_mae_vs_regret": 0.39999999999999997,
+        "spearman_crps_vs_regret": 0.7999999999999999
+      },
+      "occupancy": [
+        {
+          "season": "2021-22",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 336.5,
+          "mean_occupied": 323.2,
+          "max_occupied": 346.0,
+          "mean_occupancy_pct": 96.0
+        },
+        {
+          "season": "2021-22",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 10.0,
+          "mean_occupied": 5.8,
+          "max_occupied": 9.0,
+          "mean_occupancy_pct": 58.5
+        },
+        {
+          "season": "2022-23",
+          "unit": "G&A",
+          "days": 140,
+          "mean_open": 349.0,
+          "mean_occupied": 340.6,
+          "max_occupied": 360.0,
+          "mean_occupancy_pct": 97.6
+        },
+        {
+          "season": "2022-23",
+          "unit": "ICU",
+          "days": 140,
+          "mean_open": 10.0,
+          "mean_occupied": 5.9,
+          "max_occupied": 10.0,
+          "mean_occupancy_pct": 59.1
+        },
+        {
+          "season": "2023-24",
+          "unit": "G&A",
+          "days": 133,
+          "mean_open": 355.8,
+          "mean_occupied": 345.1,
+          "max_occupied": 377.0,
+          "mean_occupancy_pct": 97.0
+        },
+        {
+          "season": "2023-24",
+          "unit": "ICU",
+          "days": 133,
+          "mean_open": 10.0,
+          "mean_occupied": 5.1,
+          "max_occupied": 9.0,
+          "mean_occupancy_pct": 50.5
+        },
+        {
+          "season": "2024-25",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 380.9,
+          "mean_occupied": 372.0,
+          "max_occupied": 395.0,
+          "mean_occupancy_pct": 97.7
+        },
+        {
+          "season": "2024-25",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 10.0,
+          "mean_occupied": 6.0,
+          "max_occupied": 9.0,
+          "mean_occupancy_pct": 60.1
+        }
+      ]
+    },
+    "RNA": {
+      "provenance": {
+        "kind": "real (NHS England UEC daily sitrep)",
+        "trust_code": "RNA",
+        "trust_name": "The Dudley Group NHS Foundation Trust",
+        "census": "beds occupied at 8am snapshot",
+        "units": {
+          "ICU": "Adult critical care",
+          "G&A": "Adult G&A beds"
+        },
+        "days_published": 525,
+        "days_filled": 1,
+        "days_dropped": 0,
+        "values_cleaned": 2,
+        "licence": "Open Government Licence v3.0"
+      },
+      "hospital": {
+        "units": [
+          {
+            "name": "ICU",
+            "beds": 39,
+            "surge_beds": 4,
+            "patients_per_nurse": 1.5,
+            "pumps_per_patient": 3.0,
+            "shortage_cost": 12.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 4,
+            "float_ok": false
+          },
+          {
+            "name": "G&A",
+            "beds": 650,
+            "surge_beds": 33,
+            "patients_per_nurse": 6.0,
+            "pumps_per_patient": 0.5,
+            "shortage_cost": 6.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 6,
+            "float_ok": true
+          }
+        ],
+        "nurse_moves": [
+          [
+            "ICU",
+            "G&A"
+          ]
+        ],
+        "nurse_pool_max": 148,
+        "float_pool": 12,
+        "pump_fleet": 464,
+        "pump_moves_max": 47,
+        "overflow": [],
+        "outlier_cost": 1.0,
+        "nurse_cost": 1.0,
+        "agency_cost": 2.0,
+        "nurse_move_cost": 0.15,
+        "pump_move_cost": 0.1
+      },
+      "seasons": [
+        [
+          "2021-11-29",
+          "2022-04-03"
+        ],
+        [
+          "2022-11-14",
+          "2023-04-02"
+        ],
+        [
+          "2023-11-20",
+          "2024-03-31"
+        ],
+        [
+          "2024-11-25",
+          "2025-03-30"
+        ]
+      ],
+      "phases": {
+        "select": {
+          "fit_end": "2022-04-03",
+          "calibration": [
+            "2022-12-11",
+            "2023-03-26"
+          ],
+          "calibration_origins": 106,
+          "evaluation": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "evaluation_weeks": 15
+        },
+        "test": {
+          "fit_end": "2023-04-02",
+          "calibration": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "calibration_origins": 99,
+          "evaluation": [
+            "2024-12-22",
+            "2025-03-23"
+          ],
+          "evaluation_weeks": 14
+        }
+      },
+      "choice": {
+        "mae": [
+          "gbm",
+          1.0
+        ],
+        "crps": [
+          "gbm",
+          1.0
+        ],
+        "regret": [
+          "negbin_glm",
+          1.25
+        ],
+        "spearman_mae_vs_regret": 0.7999999999999999,
+        "spearman_crps_vs_regret": 0.7999999999999999
+      },
+      "occupancy": [
+        {
+          "season": "2021-22",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 582.1,
+          "mean_occupied": 547.9,
+          "max_occupied": 603.0,
+          "mean_occupancy_pct": 94.1
+        },
+        {
+          "season": "2021-22",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 33.5,
+          "mean_occupied": 23.3,
+          "max_occupied": 32.0,
+          "mean_occupancy_pct": 69.4
+        },
+        {
+          "season": "2022-23",
+          "unit": "G&A",
+          "days": 140,
+          "mean_open": 597.3,
+          "mean_occupied": 570.3,
+          "max_occupied": 611.0,
+          "mean_occupancy_pct": 95.5
+        },
+        {
+          "season": "2022-23",
+          "unit": "ICU",
+          "days": 140,
+          "mean_open": 31.3,
+          "mean_occupied": 24.1,
+          "max_occupied": 30.0,
+          "mean_occupancy_pct": 76.9
+        },
+        {
+          "season": "2023-24",
+          "unit": "G&A",
+          "days": 133,
+          "mean_open": 605.9,
+          "mean_occupied": 590.9,
+          "max_occupied": 622.0,
+          "mean_occupancy_pct": 97.5
+        },
+        {
+          "season": "2023-24",
+          "unit": "ICU",
+          "days": 133,
+          "mean_open": 31.5,
+          "mean_occupied": 22.7,
+          "max_occupied": 30.0,
+          "mean_occupancy_pct": 72.2
+        },
+        {
+          "season": "2024-25",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 642.6,
+          "mean_occupied": 628.4,
+          "max_occupied": 669.0,
+          "mean_occupancy_pct": 97.8
+        },
+        {
+          "season": "2024-25",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 29.2,
+          "mean_occupied": 24.3,
+          "max_occupied": 31.0,
+          "mean_occupancy_pct": 83.3
+        }
+      ]
+    },
+    "RTD": {
+      "provenance": {
+        "kind": "real (NHS England UEC daily sitrep)",
+        "trust_code": "RTD",
+        "trust_name": "The Newcastle Upon Tyne Hospitals NHS Foundation Trust",
+        "census": "beds occupied at 8am snapshot",
+        "units": {
+          "ICU": "Adult critical care",
+          "G&A": "Adult G&A beds"
+        },
+        "days_published": 525,
+        "days_filled": 0,
+        "days_dropped": 0,
+        "values_cleaned": 1,
+        "licence": "Open Government Licence v3.0"
+      },
+      "hospital": {
+        "units": [
+          {
+            "name": "ICU",
+            "beds": 90,
+            "surge_beds": 9,
+            "patients_per_nurse": 1.5,
+            "pumps_per_patient": 3.0,
+            "shortage_cost": 12.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 9,
+            "float_ok": false
+          },
+          {
+            "name": "G&A",
+            "beds": 1310,
+            "surge_beds": 66,
+            "patients_per_nurse": 6.0,
+            "pumps_per_patient": 0.5,
+            "shortage_cost": 6.0,
+            "bed_cost": 0.3,
+            "surge_cost": 1.5,
+            "agency_max": 11,
+            "float_ok": true
+          }
+        ],
+        "nurse_moves": [
+          [
+            "ICU",
+            "G&A"
+          ]
+        ],
+        "nurse_pool_max": 307,
+        "float_pool": 25,
+        "pump_fleet": 971,
+        "pump_moves_max": 98,
+        "overflow": [],
+        "outlier_cost": 1.0,
+        "nurse_cost": 1.0,
+        "agency_cost": 2.0,
+        "nurse_move_cost": 0.15,
+        "pump_move_cost": 0.1
+      },
+      "seasons": [
+        [
+          "2021-11-29",
+          "2022-04-03"
+        ],
+        [
+          "2022-11-14",
+          "2023-04-02"
+        ],
+        [
+          "2023-11-20",
+          "2024-03-31"
+        ],
+        [
+          "2024-11-25",
+          "2025-03-30"
+        ]
+      ],
+      "phases": {
+        "select": {
+          "fit_end": "2022-04-03",
+          "calibration": [
+            "2022-12-11",
+            "2023-03-26"
+          ],
+          "calibration_origins": 106,
+          "evaluation": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "evaluation_weeks": 15
+        },
+        "test": {
+          "fit_end": "2023-04-02",
+          "calibration": [
+            "2023-12-17",
+            "2024-03-24"
+          ],
+          "calibration_origins": 99,
+          "evaluation": [
+            "2024-12-22",
+            "2025-03-23"
+          ],
+          "evaluation_weeks": 14
+        }
+      },
+      "choice": {
+        "mae": [
+          "holt_winters",
+          1.0
+        ],
+        "crps": [
+          "negbin_glm",
+          1.0
+        ],
+        "regret": [
+          "negbin_glm",
+          0.75
+        ],
+        "spearman_mae_vs_regret": -0.7999999999999999,
+        "spearman_crps_vs_regret": 0.7999999999999999
+      },
+      "occupancy": [
+        {
+          "season": "2021-22",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 1221.7,
+          "mean_occupied": 1026.3,
+          "max_occupied": 1140.0,
+          "mean_occupancy_pct": 84.0
+        },
+        {
+          "season": "2021-22",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 82.2,
+          "mean_occupied": 59.8,
+          "max_occupied": 71.0,
+          "mean_occupancy_pct": 72.7
+        },
+        {
+          "season": "2022-23",
+          "unit": "G&A",
+          "days": 140,
+          "mean_open": 1238.2,
+          "mean_occupied": 1153.6,
+          "max_occupied": 1225.0,
+          "mean_occupancy_pct": 93.2
+        },
+        {
+          "season": "2022-23",
+          "unit": "ICU",
+          "days": 140,
+          "mean_open": 88.7,
+          "mean_occupied": 63.3,
+          "max_occupied": 77.0,
+          "mean_occupancy_pct": 71.3
+        },
+        {
+          "season": "2023-24",
+          "unit": "G&A",
+          "days": 133,
+          "mean_open": 1275.8,
+          "mean_occupied": 1147.3,
+          "max_occupied": 1270.0,
+          "mean_occupancy_pct": 89.9
+        },
+        {
+          "season": "2023-24",
+          "unit": "ICU",
+          "days": 133,
+          "mean_open": 86.3,
+          "mean_occupied": 58.4,
+          "max_occupied": 74.0,
+          "mean_occupancy_pct": 67.7
+        },
+        {
+          "season": "2024-25",
+          "unit": "G&A",
+          "days": 126,
+          "mean_open": 1276.9,
+          "mean_occupied": 1165.9,
+          "max_occupied": 1262.0,
+          "mean_occupancy_pct": 91.3
+        },
+        {
+          "season": "2024-25",
+          "unit": "ICU",
+          "days": 126,
+          "mean_open": 81.9,
+          "mean_occupied": 63.3,
+          "max_occupied": 78.0,
+          "mean_occupancy_pct": 77.3
+        }
+      ]
+    }
+  },
+  "runtime_seconds": 91.6
+}

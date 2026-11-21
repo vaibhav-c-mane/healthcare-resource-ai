@@ -17,7 +17,8 @@ Every day must be present for every unit. Unit names must match the hospital con
 
 ## What was used for the results in this repository
 
-**Semi-synthetic data only.** The build environment could not reach the public data hosts (NHS England, data.cdc.gov, healthdata.gov, PhysioNet, Zenodo were blocked by its network policy), and PhysioNet data needs credentialed access in any case. The simulator in `hcalloc/data/synthetic.py` stands in for real demand; its parameters are in `assumptions.md`. Every output file and report from it is labelled synthetic, and `results/run_metadata.json` records the generator, seed and parameters.
+- `results/` (top level): **semi-synthetic data.** The simulator in `hcalloc/data/synthetic.py` stands in for real demand; its parameters are in `assumptions.md`. Every output file and report from it is labelled synthetic, and `results/run_metadata.json` records the generator, seed and parameters.
+- `results/nhs_sitrep/`: **real bed occupancy** from NHS England's UEC daily sitreps for three trusts over four winters (2021-22 to 2024-25), with staffing, pumps and costs assumed. See its `REPORT.md`; `run_metadata.json` lists the source files and every assumed value.
 
 ## Using real data
 
@@ -38,16 +39,31 @@ Every day must be present for every unit. Unit names must match the hospital con
 
 ### NHS England daily situation reports (open data)
 
-The UEC daily sitrep spreadsheets publish, per trust and day (mostly winter months), general and acute beds open and occupied, and critical care beds open and occupied. To use them:
+The UEC daily sitrep "Web File Timeseries" workbooks publish, per trust and day for each winter (late November to March), adult general and acute (G&A) beds open and occupied and adult critical care beds open and occupied, as an 8am snapshot. They are aggregate, unvalidated management information under the Open Government Licence v3.0.
 
-1. Download the spreadsheets for the winters you need from the NHS England statistics site.
-2. Pick one trust and build the tidy CSV with two units, for example `Medical` = G&A beds occupied and `ICU` = adult critical care beds occupied, with `census` from occupied beds.
-3. Sitreps do not publish admissions or discharges. Use the `holt_winters`, `gbm`, `negbin_glm` or `seasonal_naive` forecasters, which need only census; the `flow` forecaster needs admissions and discharges.
-4. Reduce the hospital configuration to those units (`HospitalConfig(units=...)`).
+```bash
+hcalloc sitrep-fetch                       # four winters into data/sitrep/ (about 10 MB)
+hcalloc sitrep --trusts RA9 RNA RTD        # backtest + report into results/nhs_sitrep/ (about 2 minutes)
+```
+
+Or from Python:
+
+```python
+from hcalloc.data.loaders import clean_sitreps, load_uec_sitreps, sitrep_series
+sitreps = clean_sitreps(load_uec_sitreps(["data/sitrep/uec_sitrep_2023-24.xlsx", ...]))
+series = sitrep_series(sitreps, "RTD")     # units ICU (adult critical care) and G&A; census = beds occupied
+```
+
+- `load_uec_sitreps` reads the `Adult G&A beds` and `Adult critical care` sheets into one row per trust, unit and day. England totals computed from it match the published England line.
+- `clean_sitreps` blanks obvious reporting errors (a day of zeros, a fourfold jump against the running median) so they count as missing; `sitrep_series` interpolates gaps of up to 3 days inside a winter.
+- The series has gaps between winters. `DailySeries.observed` marks the days with data; forecasters fit and forecast only from origins with 28 observed days behind them and 7 ahead, and `season_phases` splits by winter (select on the third, test on the fourth) instead of `standard_phases`' calendar years.
+- Sitreps do not publish admissions or discharges, so `default_forecasters(census_only=True)` leaves out the `flow` model and uses gradient boosting scaled by each origin's own 28-day level, because bed bases rise from one winter to the next.
+- `trust_hospital` builds the assumed hospital (bed base = most beds opened in earlier winters; ratios, pools, pumps and costs from `StaffingAssumptions`).
+- The tidy CSVs written to `results/nhs_sitrep/data/` have empty `admissions` and `discharges` and an extra `beds_open` column; read them with `DailySeries.read_csv(path, allow_gaps=True)`.
 
 ### HHS / CDC hospital capacity (US, open data)
 
-Weekly facility-level beds and occupancy (HHS, 2020 to 2024) and weekly state-level respiratory hospital data (CDC NHSN) are useful for regional trends and as external covariates. They are weekly, so they do not support daily planning directly.
+Weekly facility-level beds and occupancy (HHS, 2020 to 2024) and weekly state-level respiratory hospital data (CDC NHSN, data.cdc.gov dataset `mpgq-jmmr`) are useful for regional trends and as external covariates. They are weekly, so they do not support daily planning directly, and no loader is included yet.
 
 ## Privacy
 
